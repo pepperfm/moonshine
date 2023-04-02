@@ -1,14 +1,16 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Fields;
 
-use Leeto\MoonShine\Traits\Fields\FieldWithFieldsTrait;
+use Leeto\MoonShine\Traits\Fields\CheckboxTrait;
 
-class Checkbox extends BaseField
+class Checkbox extends Field
 {
-    use FieldWithFieldsTrait;
+    use CheckboxTrait;
 
-    protected static string $view = 'checkbox';
+    protected static string $view = 'moonshine::fields.checkbox';
 
     protected static string $type = 'checkbox';
 }

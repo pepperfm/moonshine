@@ -3,29 +3,32 @@
   "description": "Laravel dashboard",
   "keywords": ["laravel", "admin", "dashboard", "moonshine"],
   "type": "library",
-  "homepage": "https://github.com/lee-to/moonshine",
+  "homepage": "https://moonshine.cutcode.dev",
   "license": "MIT",
+  "support": {
+    "issues": "https://github.com/lee-to/moonshine/issues",
+    "source": "https://github.com/lee-to/moonshine"
+  },
   "authors": [
     {
       "name": "Danil Shutsky",
       "email": "info@cutcode.ru",
-      "homepage": "https://github.com/lee-to"
+      "homepage": "https://cutcode.dev"
     }
   ],
   "require": {
-    "php": "^8.0|^8.1",
+    "php": "^8.0|^8.1|^8.2",
     "ext-curl": "*",
     "ext-json": "*",
-    "laravel/framework": "^9",
-    "symfony/var-dumper": "^6.0",
-    "phpoffice/phpspreadsheet": "*"
+    "rap2hpoutre/fast-excel": "^5.0",
+    "lee-to/laravel-package-command": "^0.9.1"
   },
   "require-dev": {
-    "fakerphp/faker": "^1.9.2",
     "phpunit/phpunit": "^9.5.8",
     "mockery/mockery": "^1.4.4",
     "phpstan/phpstan": "^1.4.7",
-    "orchestra/testbench": "^7.5"
+    "orchestra/testbench": "^4.0|^5.0|^6.0|^7.0|^8.0",
+    "brianium/paratest": "^6.8"
   },
   "autoload": {
     "psr-4": {
@@ -34,8 +37,20 @@
   },
   "autoload-dev": {
     "psr-4": {
-      "Leeto\\MoonShine\\Tests\\": "tests/"
+      "Leeto\\MoonShine\\Tests\\": "tests/",
+      "Leeto\\MoonShine\\Database\\Factories\\": "database/factories/"
     }
+  },
+  "suggest": {
+    "laravel/socialite": "Required to use the Socialite",
+    "unisharp/laravel-filemanager": "Required if you want tinymce file manager"
+  },
+  "conflict": {
+    "laravel/framework": "<9.37.0"
+  },
+  "scripts": {
+    "test": "vendor/bin/phpunit",
+    "format": "vendor/bin/php-cs-fixer fix --allow-risky=yes"
   },
   "extra": {
     "laravel": {

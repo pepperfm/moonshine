@@ -1,25 +1,40 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Fields;
 
+use Closure;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Stringable;
-use Leeto\MoonShine\Contracts\Fields\FieldHasFieldsContract;
-use Leeto\MoonShine\Contracts\Fields\FieldHasRelationContract;
-use Leeto\MoonShine\Contracts\Fields\FieldWithPivotContract;
-use Leeto\MoonShine\Traits\Fields\FieldSelectTransformer;
-use Leeto\MoonShine\Traits\Fields\FieldWithFieldsTrait;
-use Leeto\MoonShine\Traits\Fields\FieldWithPivotTrait;
-use Leeto\MoonShine\Traits\Fields\FieldWithRelationshipsTrait;
-use Leeto\MoonShine\Traits\Fields\SearchableSelectFieldTrait;
+use Leeto\MoonShine\Contracts\Fields\HasFields;
+use Leeto\MoonShine\Contracts\Fields\HasPivot;
+use Leeto\MoonShine\Contracts\Fields\Relationships\HasRelationship;
+use Leeto\MoonShine\Contracts\Fields\Relationships\ManyToManyRelation;
+use Leeto\MoonShine\MoonShineRequest;
+use Leeto\MoonShine\Traits\Fields\CanBeMultiple;
+use Leeto\MoonShine\Traits\Fields\CheckboxTrait;
+use Leeto\MoonShine\Traits\Fields\Searchable;
+use Leeto\MoonShine\Traits\Fields\SelectTransform;
+use Leeto\MoonShine\Traits\Fields\WithPivot;
+use Leeto\MoonShine\Traits\Fields\WithRelationship;
+use Leeto\MoonShine\Traits\WithFields;
 
-class BelongsToMany extends BaseField implements FieldHasRelationContract, FieldWithPivotContract, FieldHasFieldsContract
+class BelongsToMany extends Field implements HasRelationship, HasPivot, HasFields, ManyToManyRelation
 {
-    use FieldSelectTransformer, FieldWithRelationshipsTrait, FieldWithFieldsTrait, FieldWithPivotTrait;
-    use SearchableSelectFieldTrait;
+    use WithFields;
+    use WithPivot;
+    use WithRelationship;
+    use CheckboxTrait;
+    use Searchable;
+    use SelectTransform;
+    use CanBeMultiple;
 
-    public static string $view = 'belongs-to-many';
+    public static string $view = 'moonshine::fields.belongs-to-many';
+
+    protected bool $group = true;
 
     protected bool $tree = false;
 
@@ -29,9 +44,70 @@ class BelongsToMany extends BaseField implements FieldHasRelationContract, Field
 
     protected array $ids = [];
 
+    protected bool $onlyCount = false;
+
+    protected bool $onlySelected = false;
+
+    protected ?string $searchColumn = null;
+
+    protected ?Closure $searchQuery = null;
+
+    protected ?Closure $searchValueCallback = null;
+
     public function ids(): array
     {
         return $this->ids;
+    }
+
+    public function searchQuery(): ?Closure
+    {
+        return $this->searchQuery;
+    }
+
+    public function searchValueCallback(): ?Closure
+    {
+        return $this->searchValueCallback;
+    }
+
+    public function searchColumn(): ?string
+    {
+        return $this->searchColumn;
+    }
+
+    public function isOnlySelected(): bool
+    {
+        return $this->onlySelected;
+    }
+
+    public function onlySelected(string $relation, string $searchColumn = null, ?Closure $searchQuery = null, ?Closure $searchValueCallback = null): static
+    {
+        $this->onlySelected = true;
+        $this->searchColumn = $searchColumn;
+        $this->searchQuery = $searchQuery;
+        $this->searchValueCallback = $searchValueCallback;
+
+        $this->valuesQuery = function (Builder $query) use ($relation) {
+            $request = app(MoonShineRequest::class);
+
+            if ($request->getId()) {
+                $related = $this->getRelated($request->getItem());
+                $table = $related->{$relation}()->getRelated()->getTable();
+                $key = $related->{$relation}()->getRelated()->getKeyName();
+
+                return $query->whereRelation($relation, "$table.$key", '=', $request->getId());
+            }
+
+            return $query->has($relation, '>');
+        };
+
+        return $this;
+    }
+
+    public function onlyCount(): static
+    {
+        $this->onlyCount = true;
+
+        return $this;
     }
 
     public function treeHtml(): string
@@ -76,35 +152,46 @@ class BelongsToMany extends BaseField implements FieldHasRelationContract, Field
     {
         $this->makeTree($this->treePerformData($data));
 
-        $this->treeHtml = str($this->treeHtml())->wrap("<ul>", "</ul>");
+        $this->treeHtml = (string) str($this->treeHtml())->wrap("<ul class='tree-list'>", "</ul>");
     }
 
     public function buildTreeHtml(Model $item): string
     {
-        $data = $item->{$this->relation()}()->getRelated()->all();
+        $related = $this->getRelated($item);
+        $query = $related->newModelQuery();
+
+        if (is_callable($this->valuesQuery)) {
+            $query = call_user_func($this->valuesQuery, $query);
+        }
+
+        $data = $query->get();
 
         $this->treePerformHtml($data);
 
         return $this->treeHtml();
     }
 
-    private function makeTree(array $performedData, int $parent_id = 0, int $offset = 0): void
+    private function makeTree(array $performedData, int|string $parent_id = 0, int $offset = 0): void
     {
-        if(isset($performedData[$parent_id])) {
-            foreach($performedData[$parent_id] as $item)
-            {
+        if (isset($performedData[$parent_id])) {
+            foreach ($performedData[$parent_id] as $item) {
                 $this->ids[] = $item->getKey();
 
-                $element = view('moonshine::fields.shared.checkbox', [
-                    'meta' => $this->meta(),
-                    'id' => $this->id(),
-                    'name' => $this->name(),
-                    'value' => $item->getKey(),
-                    'label' => $item->{$this->resourceTitleField()}
+                $element = view('moonshine::components.form.input-composition', [
+                    'attributes' => $this->attributes()->merge([
+                        'type' => 'checkbox',
+                        'id' => $this->id((string) $item->getKey()),
+                        'name' => $this->name(),
+                        'value' => $item->getKey(),
+                        'class' => 'form-group-inline',
+                    ]),
+                    'beforeLabel' => true,
+                    'label' => $item->{$this->resourceTitleField()},
                 ]);
 
                 $this->treeHtml .= str($element)->wrap(
-                    "<li x-ref='item_{$item->getKey()}' style='margin-left: ".($offset*50)."px' class='mb-3 bg-purple py-4 px-4 rounded-md'>",
+                    "<li x-ref='item_{$item->getKey()}'
+                            style='margin-left: ".($offset * 30)."px'>",
                     "</li>"
                 );
 
@@ -117,29 +204,35 @@ class BelongsToMany extends BaseField implements FieldHasRelationContract, Field
     {
         $result = str('');
 
-        return $item->{$this->relation()}->map(function ($item) use($result) {
+        if ($this->onlyCount) {
+            return (string) $item->{$this->relation()}->count();
+        }
+
+        return (string) $item->{$this->relation()}->map(function ($item) use ($result) {
             $pivotAs = $this->getPivotAs($item);
 
-
             $result = $result->append($item->{$this->resourceTitleField()})
-                ->when($this->hasFields(), fn(Stringable $str) => $str->append(' - '));
+                ->when($this->hasFields(), fn (Stringable $str) => $str->append(' - '));
 
             foreach ($this->getFields() as $field) {
-                $result = $result->when($field->formViewValue($item->{$pivotAs}), function (Stringable $str) use($pivotAs, $field, $item) {
-                    return $str->append($field->formViewValue($item->{$pivotAs}));
-                });
+                $result = $result->when(
+                    $field->formViewValue($item->{$pivotAs}),
+                    function (Stringable $str) use ($pivotAs, $field, $item) {
+                        return $str->append($field->formViewValue($item->{$pivotAs}));
+                    }
+                );
             }
 
             return (string) $result;
-        })->implode(',');
+        })->implode(', ');
     }
 
     public function save(Model $item): Model
     {
-        $values = $this->requestValue() ? $this->requestValue() : [];
+        $values = $this->requestValue() ?: [];
         $sync = [];
 
-        if($this->hasFields()) {
+        if ($this->hasFields()) {
             foreach ($values as $index => $value) {
                 foreach ($this->getFields() as $field) {
                     $sync[$value][$field->field()] = $field->requestValue()[$index] ?? '';

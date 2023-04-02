@@ -1,63 +1,116 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Actions;
 
-use Illuminate\Contracts\Foundation\Application;
-use Illuminate\Contracts\Routing\ResponseFactory;
-use Illuminate\Http\Response;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Storage;
 use Leeto\MoonShine\Contracts\Actions\ActionContract;
+use Leeto\MoonShine\Contracts\Resources\ResourceContract;
 use Leeto\MoonShine\Exceptions\ActionException;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Exception;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Leeto\MoonShine\Jobs\ExportActionJob;
+use Leeto\MoonShine\Notifications\MoonShineNotification;
+use Leeto\MoonShine\Traits\WithQueue;
+use Leeto\MoonShine\Traits\WithStorage;
+use OpenSpout\Common\Exception\InvalidArgumentException;
+use OpenSpout\Common\Exception\IOException;
+use OpenSpout\Common\Exception\UnsupportedTypeException;
+use OpenSpout\Writer\Exception\WriterNotOpenedException;
+use Rap2hpoutre\FastExcel\FastExcel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
-class ExportAction extends BaseAction implements ActionContract
+class ExportAction extends Action implements ActionContract
 {
+    use WithStorage;
+    use WithQueue;
+
+    protected static string $view = 'moonshine::actions.export';
+
+    protected string $triggerKey = 'exportAction';
+
     /**
-     * @throws Exception|ActionException
+     * @throws ActionException
+     * @throws IOException
+     * @throws WriterNotOpenedException
+     * @throws UnsupportedTypeException
+     * @throws InvalidArgumentException
      */
-    public function handle(): Response|Application|ResponseFactory
+    public function handle(): RedirectResponse|BinaryFileResponse
     {
-        if(is_null($this->resource())) {
+        if (is_null($this->resource())) {
             throw new ActionException('Resource is required for action');
         }
 
-        $spreadsheet = new Spreadsheet();
-        $sheet = $spreadsheet->getActiveSheet();
+        $this->resolveStorage();
 
-        $letter = 'A';
+        $path = Storage::disk($this->getDisk())
+            ->path("{$this->getDir()}/{$this->resource()->routeNameAlias()}.xlsx");
 
-        foreach ($this->resource()->exportFields() as $field) {
-            $sheet->setCellValue("{$letter}1", $field->label());
+        if ($this->isQueue()) {
+            ExportActionJob::dispatch(
+                get_class($this->resource()),
+                $path,
+                $this->getDisk(),
+                $this->getDir()
+            );
 
-            $letter++;
+            return redirect()
+                ->back()
+                ->with('alert', trans('moonshine::ui.resource.queued'));
         }
 
-        $sheet->getStyle("A1:{$letter}1")->getFont()->setBold(true);
+        return response()->download(
+            self::process($path, $this->resource(), $this->getDisk(), $this->getDir())
+        );
+    }
 
+    /**
+     * @throws WriterNotOpenedException
+     * @throws IOException
+     * @throws UnsupportedTypeException
+     * @throws InvalidArgumentException
+     */
+    public static function process(
+        string $path,
+        ResourceContract $resource,
+        string $disk = 'public',
+        string $dir = '/'
+    ): string {
+        $fields = $resource->getFields()->exportFields();
 
-        $line = 2;
-        foreach ($this->resource()->all() as $item) {
-            $letter = 'A';
-            foreach ($this->resource()->exportFields() as $index => $field) {
-                $sheet->setCellValue($letter . $line, $field->exportViewValue($item));
-                $letter++;
+        $items = $resource->resolveQuery()->get();
+
+        $data = collect();
+
+        foreach ($items as $item) {
+            $row = [];
+
+            foreach ($fields as $field) {
+                $row[$field->label()] = $field->exportViewValue($item);
             }
 
-            $line++;
+            $data->add($row);
         }
 
-        $writer = new Xlsx($spreadsheet);
-        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        header('Content-Disposition: attachment;filename="'.$this->resource()->title().'.xlsx"');
-        header('Cache-Control: max-age=0');
+        $result = (new FastExcel($data))
+            ->export($path);
 
-        return response($writer->save('php://output'));
+        $url = str($path)
+            ->remove(Storage::disk($disk)->path($dir))
+            ->value();
+
+        MoonShineNotification::send(
+            trans('moonshine::ui.resource.export.exported'),
+            ['link' => Storage::disk($disk)->url(trim($dir, '/') . $url), 'label' => trans('moonshine::ui.download')]
+        );
+
+        return $result;
     }
 
     public function isTriggered(): bool
     {
-        return request()->has('exportCsv');
+        return request()->has($this->triggerKey);
     }
 
     /**
@@ -65,17 +118,17 @@ class ExportAction extends BaseAction implements ActionContract
      */
     public function url(): string
     {
-        if(is_null($this->resource())) {
+        if (is_null($this->resource())) {
             throw new ActionException('Resource is required for action');
         }
 
-        $query = ['exportCsv' => true];
+        $query = [$this->triggerKey => true];
 
-        if(request()->has('filters')) {
+        if (request()->has('filters')) {
             foreach (request()->query('filters') as $filterField => $filterQuery) {
-                if(is_array($filterQuery)) {
+                if (is_array($filterQuery)) {
                     foreach ($filterQuery as $filterInnerField => $filterValue) {
-                        if(is_numeric($filterInnerField) && !is_array($filterValue)) {
+                        if (is_numeric($filterInnerField) && ! is_array($filterValue)) {
                             $query['filters'][$filterField][] = $filterValue;
                         } else {
                             $query['filters'][$filterInnerField] = $filterValue;
@@ -87,10 +140,18 @@ class ExportAction extends BaseAction implements ActionContract
             }
         }
 
-        if(request()->has('search')) {
+        if (request()->has('search')) {
             $query['search'] = request('search');
         }
 
-        return $this->resource()->route('index', null, $query);
+        return $this->resource()
+            ->route('actions.index', query: $query);
+    }
+
+    protected function resolveStorage(): void
+    {
+        if (! Storage::disk($this->getDisk())->exists($this->getDir())) {
+            Storage::disk($this->getDisk())->makeDirectory($this->getDir());
+        }
     }
 }

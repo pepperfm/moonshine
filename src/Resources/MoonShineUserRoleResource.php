@@ -1,35 +1,51 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Resources;
 
-
+use Leeto\MoonShine\Decorations\Block;
 use Leeto\MoonShine\Fields\ID;
 use Leeto\MoonShine\Fields\Text;
 use Leeto\MoonShine\Filters\TextFilter;
 use Leeto\MoonShine\Models\MoonshineUserRole;
 
-class MoonShineUserRoleResource extends BaseResource
+class MoonShineUserRoleResource extends Resource
 {
-	public static string $model = MoonshineUserRole::class;
-
-    public static string $title = 'Роли';
+    public static string $model = MoonshineUserRole::class;
 
     public string $titleField = 'name';
 
-    public static bool $system = true;
+    protected static bool $system = true;
+
+    protected bool $createInModal = true;
+
+    protected bool $editInModal = true;
+
+    public function title(): string
+    {
+        return trans('moonshine::ui.resource.role');
+    }
 
     public function fields(): array
     {
         return [
-            ID::make()->sortable()->showOnExport(),
-            Text::make('Название', 'name')->required()->showOnExport(),
+            Block::make(trans('moonshine::ui.resource.main_information'), [
+                ID::make()
+                    ->sortable()
+                    ->showOnExport(),
+
+                Text::make(trans('moonshine::ui.resource.role_name'), 'name')
+                    ->required()
+                    ->showOnExport(),
+            ]),
         ];
     }
 
     public function rules($item): array
     {
         return [
-            'name' => 'required|min:5',
+            'name' => ['required', 'min:5'],
         ];
     }
 
@@ -41,7 +57,7 @@ class MoonShineUserRoleResource extends BaseResource
     public function filters(): array
     {
         return [
-            TextFilter::make('Название', 'name'),
+            TextFilter::make(trans('moonshine::ui.resource.role_name'), 'name'),
         ];
     }
 

@@ -1,17 +1,38 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Fields;
 
-use Leeto\MoonShine\Contracts\Fields\FieldHasFieldsContract;
-use Leeto\MoonShine\Contracts\Fields\FieldHasRelationContract;
-use Leeto\MoonShine\Traits\Fields\FieldWithFieldsTrait;
-use Leeto\MoonShine\Traits\Fields\FieldWithRelationshipsTrait;
-use Leeto\MoonShine\Traits\Fields\HasOneRelationConceptTrait;
+use Leeto\MoonShine\Contracts\Fields\HasFields;
+use Leeto\MoonShine\Contracts\Fields\HasFullPageMode;
+use Leeto\MoonShine\Contracts\Fields\HasJsonValues;
+use Leeto\MoonShine\Contracts\Fields\Relationships\HasRelationship;
+use Leeto\MoonShine\Contracts\Fields\Relationships\HasResourceMode;
+use Leeto\MoonShine\Contracts\Fields\Relationships\OneToOneRelation;
+use Leeto\MoonShine\Traits\Fields\HasOneOrMany;
+use Leeto\MoonShine\Traits\Fields\WithFullPageMode;
+use Leeto\MoonShine\Traits\Fields\WithJsonValues;
+use Leeto\MoonShine\Traits\Fields\WithRelationship;
+use Leeto\MoonShine\Traits\Fields\WithResourceMode;
+use Leeto\MoonShine\Traits\WithFields;
 
-class HasOne extends BaseField implements FieldHasRelationContract, FieldHasFieldsContract
+class HasOne extends Field implements
+    HasRelationship,
+    HasFields,
+    HasJsonValues,
+    HasResourceMode,
+    HasFullPageMode,
+    OneToOneRelation
 {
-    use HasOneRelationConceptTrait;
-    use FieldWithRelationshipsTrait, FieldWithFieldsTrait;
+    use WithFields;
+    use WithJsonValues;
+    use WithResourceMode;
+    use WithFullPageMode;
+    use WithRelationship;
+    use HasOneOrMany;
 
-    protected static string $view = 'has-one';
+    protected static string $view = 'moonshine::fields.has-one';
+
+    protected bool $group = true;
 }

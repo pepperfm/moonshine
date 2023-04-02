@@ -1,0 +1,13 @@
+<?php
+
+namespace {namespace};
+
+use Leeto\MoonShine\Dashboard\DashboardScreen;
+
+class Dashboard extends DashboardScreen
+{
+	public function blocks(): array
+	{
+		return [];
+	}
+}

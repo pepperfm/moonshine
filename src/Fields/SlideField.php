@@ -1,16 +1,21 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Fields;
 
-
 use Illuminate\Database\Eloquent\Model;
-use Leeto\MoonShine\Traits\Fields\NumberFieldTrait;
+use Leeto\MoonShine\Traits\Fields\NumberTrait;
+use Leeto\MoonShine\Traits\Fields\SlideTrait;
 
-class SlideField extends BaseField
+class SlideField extends Field
 {
-    use NumberFieldTrait;
+    use NumberTrait;
+    use SlideTrait;
 
-    protected static string $view = 'slide';
+    protected static string $view = 'moonshine::fields.slide';
+
+    protected array $attributes = ['min', 'max', 'step'];
 
     public function indexViewValue(Model $item, bool $container = true): string
     {
@@ -26,7 +31,7 @@ class SlideField extends BaseField
     {
         return [
             $this->fromField => $item->{$this->fromField},
-            $this->toField => $item->{$this->toField}
+            $this->toField => $item->{$this->toField},
         ];
     }
 
@@ -34,7 +39,7 @@ class SlideField extends BaseField
     {
         $values = $this->requestValue();
 
-        if($values === false) {
+        if ($values === false) {
             return $item;
         }
 

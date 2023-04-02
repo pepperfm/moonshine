@@ -1,10 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Fields;
 
-class Color extends BaseField
+class Color extends Field
 {
-    protected static string $view = 'input';
-
-    protected static string $type = 'color';
+    protected static string $view = 'moonshine::fields.color';
 }

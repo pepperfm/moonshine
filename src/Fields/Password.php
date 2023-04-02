@@ -1,16 +1,18 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Fields;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Password extends BaseField
+class Password extends Field
 {
-    public static string $view = 'input';
+    public static string $view = 'moonshine::fields.input';
 
     public static string $type = 'password';
 
-    protected string $autocomplete = 'new-password';
+    protected array $attributes = ['autocomplete'];
 
     public function exportViewValue(Model $item): string
     {
@@ -29,7 +31,7 @@ class Password extends BaseField
 
     public function save(Model $item): Model
     {
-        if($this->requestValue()) {
+        if ($this->requestValue()) {
             $item->{$this->field()} = bcrypt($this->requestValue());
         }
 

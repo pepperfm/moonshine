@@ -1,11 +1,16 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Fields;
 
+use Leeto\MoonShine\Traits\Fields\WithMask;
 
-class Text extends BaseField
+class Text extends Field
 {
-    public static string $view = 'input';
+    use WithMask;
+
+    public static string $view = 'moonshine::fields.input';
 
     public static string $type = 'text';
 }

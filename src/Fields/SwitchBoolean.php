@@ -1,24 +1,49 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Fields;
 
-
+use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
-use Leeto\MoonShine\Traits\Fields\BooleanFieldTrait;
+use Leeto\MoonShine\Helpers\Condition;
+use Leeto\MoonShine\Traits\Fields\BooleanTrait;
 
-class SwitchBoolean extends BaseField
+class SwitchBoolean extends Field
 {
-    use BooleanFieldTrait;
+    use BooleanTrait;
 
-    protected static string $view = 'switch';
+    protected static string $view = 'moonshine::fields.switch';
 
-    public function indexViewValue(Model $item, bool $container = true): string
+    protected bool $autoUpdate = true;
+
+    public function autoUpdate(mixed $condition = null): static
     {
+        $this->autoUpdate = Condition::boolean($condition, true);
+
+        return $this;
+    }
+
+    public function indexViewValue(Model $item, bool $container = true): View
+    {
+        $this->disabled(! $this->autoUpdate);
 
         return view('moonshine::fields.switch', [
-            'field' => $this->disabled(),
-            'item' => $item
+            'element' => $this,
+            'autoUpdate' => $this->autoUpdate,
+            'item' => $item,
         ]);
     }
 
+    public function exportViewValue(Model $item): mixed
+    {
+        return $item->{$this->field()};
+    }
+
+    public function readonly($condition = null): static
+    {
+        $this->autoUpdate(false);
+
+        return parent::readonly($condition);
+    }
 }

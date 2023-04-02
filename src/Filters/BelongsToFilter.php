@@ -1,17 +1,20 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Filters;
 
+use Leeto\MoonShine\Contracts\Fields\Relationships\BelongsToRelation;
+use Leeto\MoonShine\Contracts\Fields\Relationships\HasRelationship;
+use Leeto\MoonShine\Traits\Fields\CanBeMultiple;
+use Leeto\MoonShine\Traits\Fields\Searchable;
+use Leeto\MoonShine\Traits\Fields\WithRelationship;
 
-use Leeto\MoonShine\Contracts\Fields\FieldHasRelationContract;
-use Leeto\MoonShine\Traits\Fields\FieldWithRelationshipsTrait;
-use Leeto\MoonShine\Traits\Fields\SearchableSelectFieldTrait;
-
-class BelongsToFilter extends BaseFilter implements FieldHasRelationContract
+class BelongsToFilter extends Filter implements HasRelationship, BelongsToRelation
 {
-    use SearchableSelectFieldTrait, FieldWithRelationshipsTrait;
+    use CanBeMultiple;
+    use Searchable;
+    use WithRelationship;
 
-    public static bool $toOne = true;
-
-    public static string $view = 'select';
+    public static string $view = 'moonshine::filters.select';
 }

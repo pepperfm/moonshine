@@ -1,16 +1,18 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Fields;
 
 use Illuminate\Database\Eloquent\Model;
 
-class PasswordRepeat extends BaseField
+class PasswordRepeat extends Field
 {
-    public static string $view = 'input';
+    public static string $view = 'moonshine::fields.input';
 
     public static string $type = 'password';
 
-    protected string $autocomplete = 'confirm-password';
+    protected array $attributes = ['autocomplete'];
 
     public function exportViewValue(Model $item): string
     {

@@ -1,12 +1,18 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Filters;
 
-use Leeto\MoonShine\Traits\Fields\SearchableSelectFieldTrait;
+use Leeto\MoonShine\Traits\Fields\CanBeMultiple;
+use Leeto\MoonShine\Traits\Fields\Searchable;
+use Leeto\MoonShine\Traits\Fields\SelectTrait;
 
-class SelectFilter extends BaseFilter
+class SelectFilter extends Filter
 {
-    use SearchableSelectFieldTrait;
+    use CanBeMultiple;
+    use Searchable;
+    use SelectTrait;
 
-    public static string $view = 'select';
+    public static string $view = 'moonshine::filters.select';
 }

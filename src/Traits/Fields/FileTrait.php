@@ -1,123 +1,216 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Traits\Fields;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 use Leeto\MoonShine\Exceptions\FieldException;
+use Leeto\MoonShine\Helpers\Condition;
+use Leeto\MoonShine\Traits\WithStorage;
 use Throwable;
 
 trait FileTrait
 {
-    protected string $disc = 'public';
+    use WithStorage;
 
-    protected string $dir = '/';
+    protected string $withPrefix = '';
 
-    protected array $allowedExtension = [];
+    protected array $allowedExtensions = [];
 
     protected bool $disableDownload = false;
 
-    public function disc(string $disc): static
+    protected bool $keepOriginalFileName = false;
+
+    public function keepOriginalFileName(): static
     {
-        $this->disc = $disc;
+        $this->keepOriginalFileName = true;
 
         return $this;
     }
 
-    public function getDisc(): string
+    public function withPrefix(string $withPrefix): static
     {
-        return $this->disc;
-    }
-
-    public function dir(string $dir): static
-    {
-        $this->dir = $dir;
+        $this->withPrefix = $withPrefix;
 
         return $this;
     }
 
-    public function getDir(): string
+    public function prefix(): string
     {
-        return $this->dir;
+        return $this->withPrefix;
     }
 
-    public function allowedExtension(array $allowedExtension): static
+    public function allowedExtensions(array $allowedExtensions): static
     {
-        $this->allowedExtension = $allowedExtension;
+        $this->allowedExtensions = $allowedExtensions;
+        if (! empty($allowedExtensions)) {
+            $this->setAttribute("accept", $this->acceptExtension());
+        }
 
         return $this;
     }
 
-    public function getAllowedExtension(): array
+    public function getAllowedExtensions(): array
     {
-        return $this->allowedExtension;
+        return $this->allowedExtensions;
     }
 
+    /**
+     * @param  string  $extension
+     * @return bool
+     */
     public function isAllowedExtension(string $extension): bool
     {
-        return in_array($extension, $this->getAllowedExtension());
+        return empty($this->getAllowedExtensions())
+            || in_array($extension, $this->getAllowedExtensions(), true);
     }
 
-    public function disableDownload(): static
+    public function disableDownload($condition = null): static
     {
-        $this->disableDownload = true;
+        $this->disableDownload = Condition::boolean($condition, true);
 
         return $this;
     }
 
     public function canDownload(): bool
     {
-        return !$this->disableDownload;
+        return ! $this->disableDownload;
+    }
+
+    public function path(string $value): string
+    {
+        return Storage::disk($this->getDisk())
+            ->url($this->unPrefixedValue($value));
     }
 
     /**
      * @throws Throwable
      */
-    private function store(UploadedFile $file): string
+    public function store(UploadedFile $file): string
     {
         $extension = $file->extension();
 
         throw_if(
-            !$this->isAllowedExtension($extension),
+            ! $this->isAllowedExtension($extension),
             new FieldException("$extension not allowed")
         );
 
-        return $file->store($this->getDir(), $this->getDisc());
+        if ($this->keepOriginalFileName) {
+            return $this->prefixedValue(
+                $file->storeAs(
+                    $this->getDir(),
+                    $file->getClientOriginalName(),
+                    $this->getDisk()
+                )
+            );
+        }
+
+        return $this->prefixedValue(
+            $file->store($this->getDir(), $this->getDisk())
+        );
     }
 
+    /**
+     * @throws Throwable
+     */
+    public function hasManyOrOneSave($hiddenKey, array $values = []): array
+    {
+        if ($this->isMultiple()) {
+            $saveValues = collect(request($hiddenKey, []))
+                ->map(fn ($file) => $this->prefixedValue($file));
+
+            if (isset($values[$this->field()])) {
+                foreach ($values[$this->field()] as $value) {
+                    $saveValues = $saveValues->merge([
+                        $this->store($value),
+                    ]);
+                }
+            }
+
+            $values[$this->field()] = $saveValues->values()
+                ->unique()
+                ->map(fn ($file) => $this->prefixedValue($file))
+                ->toArray();
+        } elseif (isset($values[$this->field()])) {
+            $values[$this->field()] = $this->store($values[$this->field()]);
+        }
+
+        return $values;
+    }
+
+    /**
+     * @throws Throwable
+     */
     public function save(Model $item): Model
     {
         $requestValue = $this->requestValue();
-        $oldValues = collect(request("hidden_{$this->field()}", []));
-        $saveValue = $this->isMultiple() ? $oldValues : null;
+        $oldValues = collect(request("hidden_{$this->field()}", []))
+            ->map(fn ($file) => $this->prefixedValue($file));
+
+        $saveValue = $this->isMultiple() ? $oldValues : $oldValues->first();
 
         if ($requestValue !== false) {
-            if($this->isMultiple()) {
+            if ($this->isMultiple()) {
                 $paths = [];
 
                 foreach ($requestValue as $file) {
                     $paths[] = $this->store($file);
                 }
 
-                $saveValue = $saveValue->merge($paths)->unique()->toArray();
+                $saveValue = $saveValue->merge($paths)
+                    ->values()
+                    ->map(fn ($file) => $this->prefixedValue($file))
+                    ->unique()
+                    ->toArray();
             } else {
                 $saveValue = $this->store($requestValue);
             }
         }
 
-        if($saveValue) {
-            $item->{$this->field()} = $saveValue;
-        }
+        $item->{$this->field()} = $saveValue;
 
         return $item;
     }
 
+    public function formViewValue(Model $item): Collection|string
+    {
+        if ($this->isMultiple()) {
+            return collect($item->{$this->field()})
+                ->map(fn ($value) => $this->unPrefixedValue($value));
+        }
+
+        return $this->unPrefixedValue($item->{$this->field()});
+    }
+
+    protected function unPrefixedValue(string|bool|null $value): string
+    {
+        return $value ? ltrim($value, $this->prefix()) : '';
+    }
+
+    protected function prefixedValue(string|bool|null $value): string
+    {
+        return $value ? ($this->prefix() . ltrim($value, $this->prefix())) : '';
+    }
+
     public function exportViewValue(Model $item): string
     {
-        if($this->isMultiple()) {
+        if ($this->isMultiple()) {
             return collect($item->{$this->field()})->implode(';');
         }
 
-        return parent::exportViewValue($item);
+        return $item->{$this->field()} ?? '';
+    }
+
+    public function acceptExtension(): string
+    {
+        $extensions = array_map(static function ($val) {
+            return "." . $val;
+        }, $this->allowedExtensions);
+
+        return implode(",", $extensions);
     }
 }

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -15,7 +17,7 @@ class MoonshineChangeLog extends Model
         'changelogable_id',
         'changelogable_type',
         'states_before',
-        'states_after'
+        'states_after',
     ];
 
     protected $casts = [

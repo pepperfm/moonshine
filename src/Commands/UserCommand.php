@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Commands;
 
-use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Hash;
 use Leeto\MoonShine\Models\MoonshineUser;
 
-class UserCommand extends BaseMoonShineCommand
+class UserCommand extends MoonShineCommand
 {
     protected $signature = 'moonshine:user';
 
@@ -17,16 +19,16 @@ class UserCommand extends BaseMoonShineCommand
         $name = $this->ask('Name');
         $password = $this->ask('Password');
 
-        if($email && $name && $password) {
+        if ($email && $name && $password) {
             MoonshineUser::query()->create([
                 'email' => $email,
                 'name' => $name,
-                'password' => bcrypt($password)
+                'password' => Hash::make($password),
             ]);
 
-            $this->info('User is created');
+            $this->components->info('User is created');
         } else {
-            $this->error('All params is required');
+            $this->components->error('All params is required');
         }
     }
 }

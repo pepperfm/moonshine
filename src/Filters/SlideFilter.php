@@ -2,20 +2,32 @@
 
 namespace Leeto\MoonShine\Filters;
 
-
 use Illuminate\Database\Eloquent\Builder;
-use Leeto\MoonShine\Traits\Fields\NumberFieldTrait;
+use Leeto\MoonShine\Traits\Fields\NumberTrait;
+use Leeto\MoonShine\Traits\Fields\SlideTrait;
 
-class SlideFilter extends BaseFilter
+class SlideFilter extends Filter
 {
-    use NumberFieldTrait;
+    use NumberTrait;
+    use SlideTrait;
 
-    public static string $view = 'slide';
+    public static string $view = 'moonshine::filters.slide';
+
+    protected array $attributes = ['min', 'max', 'step'];
 
     public function getQuery(Builder $query): Builder
     {
-        return $this->requestValue()
-            ? $query->whereBetween('phone', array_values($this->requestValue()))
+        if ($this->requestValue() === false) {
+            $values = [];
+        } else {
+            $values = array_filter($this->requestValue(), 'is_numeric');
+        }
+
+        return $values
+            ? $query->where(function (Builder $q) use ($values) {
+                $q->where($this->fromField, '>=', $values[$this->fromField])
+                    ->where($this->toField, '<=', $values[$this->toField]);
+            })
             : $query;
     }
 }

@@ -1,20 +1,33 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Menu;
 
 use Illuminate\Support\Collection;
+use Leeto\MoonShine\MoonShineRequest;
 
 class Menu
 {
-    protected Collection|null $menu = null;
+    protected static ?Collection $menu = null;
 
-    public function register(Collection $data): void
+    public static function register(Collection $data): void
     {
-        $this->menu = $data;
+        self::$menu = $data;
     }
 
-    public function all(): Collection|null
+    public static function all(): ?Collection
     {
-        return $this->menu;
+        $request = app(MoonShineRequest::class);
+
+        return self::$menu?->filter(function ($item) use ($request) {
+            if ($item->isGroup()) {
+                $item->setItems(
+                    $item->items()->filter(fn ($subItem) => $subItem->isSee($request))
+                );
+            }
+
+            return $item->isSee($request);
+        });
     }
 }

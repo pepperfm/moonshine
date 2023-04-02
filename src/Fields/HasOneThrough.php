@@ -1,17 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Fields;
 
-use Leeto\MoonShine\Contracts\Fields\FieldHasFieldsContract;
-use Leeto\MoonShine\Contracts\Fields\FieldHasRelationContract;
-use Leeto\MoonShine\Traits\Fields\FieldWithFieldsTrait;
-use Leeto\MoonShine\Traits\Fields\FieldWithRelationshipsTrait;
-use Leeto\MoonShine\Traits\Fields\HasOneRelationConceptTrait;
-
-class HasOneThrough extends BaseField implements FieldHasRelationContract, FieldHasFieldsContract
+class HasOneThrough extends HasOne
 {
-    use HasOneRelationConceptTrait;
-    use FieldWithRelationshipsTrait, FieldWithFieldsTrait;
-
-    protected static string $view = 'has-one';
 }

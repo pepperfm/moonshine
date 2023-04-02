@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
 
 namespace Leeto\MoonShine\Traits\Fields;
+
+use Closure;
 
 trait LinkTrait
 {
@@ -9,9 +12,11 @@ trait LinkTrait
 
     protected string $linkName = '';
 
+    protected bool $linkBlank = false;
+
     public function hasLink(): bool
     {
-        return $this->getLinkValue() != '';
+        return $this->getLinkValue() !== '';
     }
 
     public function getLinkName(): string
@@ -24,10 +29,20 @@ trait LinkTrait
         return $this->linkValue;
     }
 
-    public function addLink(string $name, string $link): static
+    public function isLinkBlank(): bool
     {
+        return $this->linkBlank;
+    }
+
+    public function addLink(string $name, string|Closure $link, bool $blank = false): static
+    {
+        if (is_callable($link)) {
+            $link = $link();
+        }
+
         $this->linkValue = $link;
         $this->linkName = $name;
+        $this->linkBlank = $blank;
 
         return $this;
     }

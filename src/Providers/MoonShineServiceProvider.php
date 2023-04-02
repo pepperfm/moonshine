@@ -1,19 +1,26 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Providers;
 
+use Illuminate\Contracts\Container\Container;
+use Illuminate\Contracts\Debug\ExceptionHandler;
+use Illuminate\Foundation\Exceptions\Handler;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Blade;
-use Leeto\MoonShine\Commands\UserCommand;
+use Illuminate\Support\ServiceProvider;
 use Leeto\MoonShine\Commands\InstallCommand;
 use Leeto\MoonShine\Commands\ResourceCommand;
-use Leeto\MoonShine\Components\MenuComponent;
-use Leeto\MoonShine\Extensions\BaseExtension;
+use Leeto\MoonShine\Commands\UserCommand;
+use Leeto\MoonShine\Dashboard\Dashboard;
+use Leeto\MoonShine\Http\Middleware\Authenticate;
+use Leeto\MoonShine\Http\Middleware\ChangeLocale;
+use Leeto\MoonShine\Http\Middleware\Session;
 use Leeto\MoonShine\Menu\Menu;
-use Leeto\MoonShine\Middleware\Authenticate;
-use Leeto\MoonShine\Middleware\Session;
-use Illuminate\Support\Arr;
-use Illuminate\Support\ServiceProvider;
 use Leeto\MoonShine\MoonShine;
+use Leeto\MoonShine\Utilities\AssetManager;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class MoonShineServiceProvider extends ServiceProvider
 {
@@ -31,6 +38,7 @@ class MoonShineServiceProvider extends ServiceProvider
     protected array $middlewareGroups = [
         'moonshine' => [
             'moonshine.auth',
+            ChangeLocale::class,
         ],
     ];
 
@@ -39,7 +47,7 @@ class MoonShineServiceProvider extends ServiceProvider
      *
      * @return void
      */
-    public function register()
+    public function register(): void
     {
         $this->loadAuthConfig();
 
@@ -51,55 +59,65 @@ class MoonShineServiceProvider extends ServiceProvider
      *
      * @return void
      */
-    public function boot()
+    public function boot(): void
     {
-        $this->loadMigrationsFrom(__DIR__. '/../database/migrations');
-        $this->loadTranslationsFrom(__DIR__. '/../lang', 'moonshine');
-        $this->loadViewsFrom(__DIR__. '/../views', 'moonshine');
+        $this->app->bind(ExceptionHandler::class, function ($app) {
+            $handler = new Handler($app[Container::class]);
+
+            if (preg_match('/^' . config('moonshine.route.prefix', '\/') . '/', $app['request']->path())) {
+                $handler->renderable(function (NotFoundHttpException $e) {
+                    return response()->view('moonshine::errors.404', [
+                        'code' => $e->getStatusCode(),
+                        'message' => $e->getMessage(),
+                    ])->withHeaders($e->getHeaders());
+                });
+            }
+
+            return $handler;
+        });
+
+        if (config('moonshine.auth.enable', true)) {
+            $this->loadMigrationsFrom(MoonShine::path('/database/migrations'));
+        }
+
+        $this->loadTranslationsFrom(MoonShine::path('/lang'), 'moonshine');
+        $this->loadViewsFrom(MoonShine::path('/resources/views'), 'moonshine');
+        $this->loadRoutesFrom(MoonShine::path('/routes/moonshine.php'));
 
         $this->publishes([
-            __DIR__ . '/../config/moonshine.php' => config_path('moonshine.php'),
+            MoonShine::path('/config/moonshine.php') => config_path('moonshine.php'),
         ]);
 
         $this->mergeConfigFrom(
-            __DIR__.'/../config/moonshine.php', 'moonshine'
+            MoonShine::path('/config/moonshine.php'),
+            'moonshine'
         );
 
         $this->publishes([
-            __DIR__. '/../assets' => public_path('vendor/moonshine'),
-        ], 'public');
+            MoonShine::path('/public') => public_path('vendor/moonshine'),
+        ], ['moonshine-assets', 'laravel-assets']);
 
         $this->publishes([
-            __DIR__. '/../lang' => $this->app->langPath('vendor/moonshine'),
+            MoonShine::path('/lang') => $this->app->langPath('vendor/moonshine'),
         ]);
+
+        $this->publishes([
+            MoonShine::path('/stubs/MoonShineServiceProvider.stub') => app_path(
+                'Providers/MoonShineServiceProvider.php'
+            ),
+        ], 'moonshine-provider');
 
         if ($this->app->runningInConsole()) {
             $this->commands($this->commands);
         }
 
         Blade::withoutDoubleEncoding();
-        Blade::componentNamespace('Leeto\\MoonShine\\Components', 'moonshine');
-        Blade::component('menu-component', MenuComponent::class);
+        Blade::componentNamespace('Leeto\MoonShine\Components', 'moonshine');
 
-        $this->app->singleton(MoonShine::class, function ($app) {
-            return new MoonShine();
-        });
-
-        $this->app->singleton(Menu::class, function ($app) {
-            return new Menu();
-        });
-
-        $extensions = [];
-
-        if(config("moonshine.extensions")) {
-            foreach (config("moonshine.extensions") as $class) {
-                $extensions[] = new $class();
-            }
-        }
-
-        $this->app->bind(BaseExtension::class, function ($app) use ($extensions) {
-           return $extensions;
-        });
+        $this->app->singleton(MoonShine::class);
+        $this->app->singleton(Menu::class);
+        $this->app->singleton(Dashboard::class);
+        $this->app->singleton(AssetManager::class);
     }
 
     /**
@@ -107,7 +125,7 @@ class MoonShineServiceProvider extends ServiceProvider
      *
      * @return void
      */
-    protected function loadAuthConfig()
+    protected function loadAuthConfig(): void
     {
         config(Arr::dot(config('moonshine.auth', []), 'auth.'));
     }
@@ -117,7 +135,7 @@ class MoonShineServiceProvider extends ServiceProvider
      *
      * @return void
      */
-    protected function registerRouteMiddleware()
+    protected function registerRouteMiddleware(): void
     {
         // register route middleware.
         foreach ($this->routeMiddleware as $key => $middleware) {
@@ -125,6 +143,11 @@ class MoonShineServiceProvider extends ServiceProvider
         }
 
         // register middleware group.
+        $this->middlewareGroups['moonshine'] = array_merge(
+            $this->middlewareGroups['moonshine'],
+            config('moonshine.middlewares', [])
+        );
+
         foreach ($this->middlewareGroups as $key => $middleware) {
             app('router')->middlewareGroup($key, $middleware);
         }

@@ -1,15 +1,19 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Filters;
 
 use Illuminate\Database\Eloquent\Builder;
-use Leeto\MoonShine\Traits\Fields\DateFieldTrait;
+use Leeto\MoonShine\Traits\Fields\DateTrait;
+use Leeto\MoonShine\Traits\Fields\WithMask;
 
-class DateFilter extends BaseFilter
+class DateFilter extends Filter
 {
-    use DateFieldTrait;
+    use DateTrait;
+    use WithMask;
 
-    public static string $view = 'date';
+    public static string $view = 'moonshine::filters.date';
 
     public static string $type = 'date';
 

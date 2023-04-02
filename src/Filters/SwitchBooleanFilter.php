@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Filters;
 
-use Leeto\MoonShine\Traits\Fields\BooleanFieldTrait;
+use Leeto\MoonShine\Traits\Fields\BooleanTrait;
 
-class SwitchBooleanFilter extends BaseFilter
+class SwitchBooleanFilter extends Filter
 {
-    use BooleanFieldTrait;
+    use BooleanTrait;
 
-    public static string $view = 'switch';
+    public static string $view = 'moonshine::filters.switch';
 }

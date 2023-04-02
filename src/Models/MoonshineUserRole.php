@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -10,7 +12,7 @@ class MoonshineUserRole extends Model
 {
     use HasFactory;
 
-    public static int $MOONSHINE_DEFAULT_ROLE_ID = 1;
+    public const DEFAULT_ROLE_ID = 1;
 
     protected $fillable = ['name'];
 

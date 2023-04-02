@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Commands;
 
-use Illuminate\Console\Command;
-use Illuminate\Support\Str;
+use Illuminate\Contracts\Filesystem\FileNotFoundException;
+use Leeto\MoonShine\MoonShine;
 
-class ResourceCommand extends BaseMoonShineCommand
+class ResourceCommand extends MoonShineCommand
 {
     protected $signature = 'moonshine:resource {name?} {--m|model=} {--t|title=}';
 
@@ -16,40 +18,35 @@ class ResourceCommand extends BaseMoonShineCommand
         $this->createResource();
     }
 
+    /**
+     * @throws FileNotFoundException
+     */
     public function createResource(): void
     {
         $name = str($this->argument('name'));
 
-        if(!$name) {
+        if ($name->isEmpty()) {
             $name = str($this->ask('Resource name'));
         }
 
         $name = $name->ucfirst()
-            ->replace(['resource', 'Resource'], '');
+            ->replace(['resource', 'Resource'], '')
+            ->value();
 
-        $model = $this->option('model') ?? $name;
+        $model = $this->qualifyModel($this->option('model') ?? $name);
         $title = $this->option('title') ?? $name;
 
         $resource = $this->getDirectory()."/Resources/{$name}Resource.php";
-        $contents = $this->getStub('Resource');
-        $contents = str_replace('DummyModel', $model, $contents);
-        $contents = str_replace('DummyTitle', $title, $contents);
 
-        $this->laravel['files']->put(
-            $resource,
-            str_replace('Dummy', $name, $contents)
-        );
+        $this->copyStub('Resource', $resource, [
+            '{namespace}' => MoonShine::namespace('\Resources'),
+            'DummyModel' => $model,
+            'DummyTitle' => $title,
+            'Dummy' => $name,
+        ]);
 
-        $this->info("{$name}Resource file was created: " . str_replace(base_path(), '', $resource));
+        $this->components->info("{$name}Resource file was created: ".str_replace(base_path(), '', $resource));
 
-        $controller = $this->getDirectory()."/Controllers/{$name}Controller.php";
-        $contents = $this->getStub('ResourceController');
-
-        $this->laravel['files']->put(
-            $controller,
-            str_replace('Dummy', $name, $contents)
-        );
-
-        $this->info("{$name}Controller file was created: " . str_replace(base_path(), '', $controller));
+        $this->components->info('Now register resource in menu');
     }
 }

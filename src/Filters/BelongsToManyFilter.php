@@ -1,19 +1,31 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Filters;
 
+use Leeto\MoonShine\Contracts\Fields\HasFields;
+use Leeto\MoonShine\Contracts\Fields\Relationships\HasRelationship;
+use Leeto\MoonShine\Contracts\Fields\Relationships\ManyToManyRelation;
+use Leeto\MoonShine\Traits\Fields\CanBeMultiple;
+use Leeto\MoonShine\Traits\Fields\CheckboxTrait;
+use Leeto\MoonShine\Traits\Fields\Searchable;
+use Leeto\MoonShine\Traits\Fields\SelectTransform;
+use Leeto\MoonShine\Traits\Fields\WithPivot;
+use Leeto\MoonShine\Traits\Fields\WithRelationship;
+use Leeto\MoonShine\Traits\WithFields;
 
-use Leeto\MoonShine\Contracts\Fields\FieldHasRelationContract;
-use Leeto\MoonShine\Traits\Fields\FieldSelectTransformer;
-use Leeto\MoonShine\Traits\Fields\FieldWithFieldsTrait;
-use Leeto\MoonShine\Traits\Fields\FieldWithPivotTrait;
-use Leeto\MoonShine\Traits\Fields\FieldWithRelationshipsTrait;
-use Leeto\MoonShine\Traits\Fields\SearchableSelectFieldTrait;
-
-class BelongsToManyFilter extends BaseFilter implements FieldHasRelationContract
+class BelongsToManyFilter extends Filter implements HasRelationship, HasFields, ManyToManyRelation
 {
-    use FieldSelectTransformer, FieldWithRelationshipsTrait, FieldWithFieldsTrait, FieldWithPivotTrait;
-    use SearchableSelectFieldTrait;
+    use CheckboxTrait;
+    use Searchable;
+    use SelectTransform;
+    use WithFields;
+    use WithPivot;
+    use WithRelationship;
+    use CanBeMultiple;
 
-    public static string $view = 'belongs-to-many';
+    public static string $view = 'moonshine::filters.belongs-to-many';
+
+    protected bool $group = true;
 }

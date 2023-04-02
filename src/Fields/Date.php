@@ -1,28 +1,56 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Fields;
 
-
 use Illuminate\Database\Eloquent\Model;
-use Leeto\MoonShine\Traits\Fields\DateFieldTrait;
+use Illuminate\Support\Carbon;
+use Leeto\MoonShine\Traits\Fields\DateTrait;
+use Leeto\MoonShine\Traits\Fields\WithMask;
 
-class Date extends BaseField
+class Date extends Field
 {
-    use DateFieldTrait;
+    use DateTrait;
+    use WithMask;
 
-    protected static string $view = 'input';
+    protected static string $view = 'moonshine::fields.input';
 
     protected static string $type = 'date';
+    protected string $inputFormat = 'Y-m-d';
 
-    protected string $format = 'Y-m-d H:i:s';
-
-    public function formViewValue(Model $item): string
+    public function formViewValue(Model $item): mixed
     {
-        return date('Y-m-d', strtotime($item->{$this->name()} ?? $this->getDefault()));
+        $value = parent::formViewValue($item);
+
+        if (! $value && ! $this->getDefault() && $this->isNullable()) {
+            return '';
+        }
+
+        if (! $value) {
+            return $this->getDefault();
+        }
+
+        if ($value instanceof Carbon) {
+            return $value->format($this->inputFormat);
+        }
+
+        return date($this->inputFormat, strtotime((string) $value));
     }
 
     public function indexViewValue(Model $item, bool $container = false): string
     {
-        return date($this->format, strtotime($item->{$this->name()}));
+        $value = parent::indexViewValue($item, $container);
+
+        return $value ? date($this->format, strtotime((string) $value)) : '';
+    }
+
+    public function withTime(): static
+    {
+        self::$type = "datetime-local";
+
+        $this->inputFormat = "Y-m-d\TH:i";
+
+        return $this;
     }
 }

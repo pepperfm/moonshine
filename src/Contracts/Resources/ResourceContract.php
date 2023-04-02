@@ -1,42 +1,96 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Contracts\Resources;
 
+use Illuminate\Contracts\Database\Eloquent\Builder;
+use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Collection;
-use Leeto\MoonShine\Contracts\Components\ViewComponentContract;
+use Leeto\MoonShine\Actions\Action;
+use Leeto\MoonShine\Actions\Actions;
+use Leeto\MoonShine\Contracts\ResourceRenderable;
+use Leeto\MoonShine\Fields\Field;
+use Leeto\MoonShine\Fields\Fields;
+use Leeto\MoonShine\Filters\Filter;
+use Leeto\MoonShine\Filters\Filters;
 
 interface ResourceContract
 {
+    /**
+     * Get a resource title, will be displayed in admin panel menu
+     *
+     * @return string
+     */
     public function title(): string;
 
+    /**
+     * Define a field name, which will be used to display value in relation
+     *
+     * @return string
+     */
     public function titleField(): string;
 
-    public function getModel(): Model;
-
-    public function getItem(): Model;
-
-    public function getActions(): Collection;
-
+    /**
+     * Define if the resources protected by authentication
+     *
+     * @return bool
+     */
     public function isWithPolicy(): bool;
 
-    public function getFields(): Collection;
+    /**
+     * Get a model class, related to resource
+     *
+     * @return Model
+     */
+    public function getModel(): Model;
 
-    public function tabs(): Collection;
+    /**
+     * Get current eloquent instance
+     *
+     * @return ?Model
+     */
+    public function getItem(): ?Model;
 
-    public function indexFields(): Collection;
+    /**
+     * Get a collection of additional actions performed on resource page
+     *
+     * @return Actions<Action>
+     */
+    public function getActions(): Actions;
 
-    public function exportFields(): Collection;
+    /**
+     * Get a collection of fields of related model
+     *
+     * @return Fields<Field>
+     */
+    public function getFields(): Fields;
 
-    public function formFields(): Collection;
+    /**
+     * Get a collection of filters
+     *
+     * @return Filters<Filter>
+     */
+    public function getFilters(): Filters;
 
-    public function getAssets(string $type): array;
+    /**
+     * Check whether user can perform action on model
+     *
+     * @param  string  $ability  view, viewAny, restore, forceDelete
+     * @param  ?Model  $item  Model on which the action is performed
+     * @return bool
+     */
+    public function can(string $ability, Model $item = null): bool;
 
-    public function extensions($name, Model $item): string;
+    public function uriKey(): string;
 
-    public function renderDecoration(ViewComponentContract $decoration, Model $item);
+    public function resolveQuery(): Builder;
 
-    public function renderField(ViewComponentContract $field, Model $item);
+    public function resolveRoutes(): void;
 
-    public function renderFilter(ViewComponentContract $field, Model $item);
+    public function renderComponent(
+        ResourceRenderable $component,
+        Model $item,
+        int $level = 0
+    ): View;
 }

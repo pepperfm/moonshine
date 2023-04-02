@@ -1,23 +1,43 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Leeto\MoonShine\Fields;
 
 use Illuminate\Database\Eloquent\Model;
-use Leeto\MoonShine\Contracts\Fields\FieldHasRelationContract;
-use Leeto\MoonShine\Traits\Fields\FieldWithRelationshipsTrait;
-use Leeto\MoonShine\Traits\Fields\SearchableSelectFieldTrait;
+use Leeto\MoonShine\Contracts\Fields\Relationships\BelongsToRelation;
+use Leeto\MoonShine\Contracts\Fields\Relationships\HasRelationship;
+use Leeto\MoonShine\Traits\Fields\Searchable;
+use Leeto\MoonShine\Traits\Fields\WithRelationship;
 
-class BelongsTo extends BaseField implements FieldHasRelationContract
+class BelongsTo extends Field implements HasRelationship, BelongsToRelation
 {
-    use FieldWithRelationshipsTrait, SearchableSelectFieldTrait;
+    use Searchable;
+    use WithRelationship;
 
-    protected static bool $toOne = true;
+    protected static string $view = 'moonshine::fields.select';
 
-    protected static string $view = 'select';
+    public function isMultiple(): bool
+    {
+        return false;
+    }
 
     public function save(Model $item): Model
     {
+        if ($this->requestValue() === false) {
+            if ($this->isNullable()) {
+                return $item->{$this->relation()}()
+                    ->dissociate();
+            }
+
+            return $item;
+        }
+
+        $value = $item->{$this->relation()}()
+            ->getRelated()
+            ->findOrFail($this->requestValue());
+
         return $item->{$this->relation()}()
-            ->associate($this->requestValue());
+            ->associate($value);
     }
 }
